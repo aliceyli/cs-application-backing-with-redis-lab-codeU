@@ -114,12 +114,25 @@ public class JedisIndex {
 	 */
 	public void indexPage(String url, Elements paragraphs) {
         // FILL THIS IN!
+		hashTerms(url, paragraphs);
+
+    	pushToRedis(tc);
+	
+	}
+
+	/**
+	 * hashmaps terms in the page to the total count
+	 * 
+	 * @param url 		  URL of page
+	 * @param paragraphs  Collection of elements that should be indexed
+	 *
+	 */
+	public TermCounter hashTerms(String url, Elements paragraphs) {
 
         TermCounter tc = new TermCounter(url);
     	tc.processElements(paragraphs);
 
-    	pushToRedis(tc);
-	
+    	return tc;
 	}
 
 	/**
@@ -128,7 +141,6 @@ public class JedisIndex {
 	 *
 	 * @param tc 
 	 *
-	 * @return 
 	 */
 	public void pushToRedis(TermCounter tc) {
 		//holds the redis pushes and pushes them at the end to increase efficiency
@@ -140,16 +152,16 @@ public class JedisIndex {
     	t.del(termCounterKey(url));
 
         for (String term: tc.keySet()) {
-        	//add term into TermCounter:URL hashmap
         	Integer count = tc.get(term);
         	t.hincrBy(termCounterKey(url), term, count);
-        	//add url to URLset:term set
+        	
         	t.sadd(urlSetKey(term), url);
         }
 
         //push termcounter:url hashmap and URLset:term set to redis
         List<Object> executeTransaction = t.exec();
 	}
+
 
 	/**
 	 * Prints the contents of the index.
