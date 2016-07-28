@@ -10,6 +10,8 @@ import java.util.HashSet;
 import java.util.List;
 
 import org.jsoup.select.Elements;
+import org.jsoup.nodes.Node;
+import org.jsoup.nodes.TextNode;
 
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.Transaction;
@@ -67,8 +69,10 @@ public class JedisIndex {
 	 * @return Set of URLs.
 	 */
 	public Set<String> getURLs(String term) {
-        // FILL THIS IN!
-		return null;
+		// FILL THIS IN! DONE
+        // retrieve URLSet:term from jedis
+        // smembers gets all members in a set
+		return jedis.smembers(urlSetKey(term));
 	}
 
     /**
@@ -78,8 +82,15 @@ public class JedisIndex {
 	 * @return Map from URL to count.
 	 */
 	public Map<String, Integer> getCounts(String term) {
-        // FILL THIS IN!
-		return null;
+        // FILL THIS IN! DONE
+        // create hash map
+        Map<String, Integer> counts = new HashMap<String, Integer>();
+        Set<String> urls = getURLs(term);
+        for (String url: urls) {
+        	// add <url,getCount(url,term)>
+        	counts.put(url,getCount(url,term));
+        }
+		return counts;
 	}
 
     /**
@@ -87,11 +98,11 @@ public class JedisIndex {
 	 * 
 	 * @param url
 	 * @param term
-	 * @return
+	 * @return count
 	 */
 	public Integer getCount(String url, String term) {
-        // FILL THIS IN!
-		return null;
+		// FILL THIS IN! DONE
+		return new Integer(jedis.hget(termCounterKey(url),term));
 	}
 
 
@@ -103,6 +114,39 @@ public class JedisIndex {
 	 */
 	public void indexPage(String url, Elements paragraphs) {
         // FILL THIS IN!
+
+        TermCounter tc = new TermCounter(url);
+    	tc.processElements(paragraphs);
+
+    	pushTermCounterToRedis(tc);
+	
+	}
+
+	/**
+	 * Adds terms into TermCounter:URL hashmap 
+	 * and adds url to URLset:term set
+	 *
+	 *@param url        URL of the page
+	 *@param paragraph  Element that should be indexed
+	 */
+	public List<Object> pushTermCounterToRedis(TermCounter tc) {
+		Transaction t = jedis.multi();
+
+		String url = tc.getLabel();
+
+		// if this page has already been indexed; delete the old termcounter
+    	t.del(termCounterKey(url));
+
+        for (String term: tc.keySet()) {
+        	//add term into TermCounter:URL hashmap
+        	Integer count = tc.get(term);
+        	t.hincrBy(termCounterKey(url), term, count);
+        	//add url to URLset:term set
+        	t.sadd(urlSetKey(term), url);
+        }
+
+        List<Object> res = t.exec();
+    	return res;
 	}
 
 	/**
@@ -142,6 +186,7 @@ public class JedisIndex {
 				terms.add(array[1]);
 			}
 		}
+		System.out.println(terms);
 		return terms;
 	}
 
