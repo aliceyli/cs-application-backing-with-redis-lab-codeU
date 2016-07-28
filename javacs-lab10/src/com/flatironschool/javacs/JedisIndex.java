@@ -118,7 +118,7 @@ public class JedisIndex {
         TermCounter tc = new TermCounter(url);
     	tc.processElements(paragraphs);
 
-    	pushTermCounterToRedis(tc);
+    	pushToRedis(tc);
 	
 	}
 
@@ -126,10 +126,12 @@ public class JedisIndex {
 	 * Adds terms into TermCounter:URL hashmap 
 	 * and adds url to URLset:term set
 	 *
-	 *@param url        URL of the page
-	 *@param paragraph  Element that should be indexed
+	 * @param tc 
+	 *
+	 * @return 
 	 */
-	public List<Object> pushTermCounterToRedis(TermCounter tc) {
+	public void pushToRedis(TermCounter tc) {
+		//holds the redis pushes and pushes them at the end to increase efficiency
 		Transaction t = jedis.multi();
 
 		String url = tc.getLabel();
@@ -145,8 +147,8 @@ public class JedisIndex {
         	t.sadd(urlSetKey(term), url);
         }
 
-        List<Object> res = t.exec();
-    	return res;
+        //push termcounter:url hashmap and URLset:term set to redis
+        List<Object> executeTransaction = t.exec();
 	}
 
 	/**
